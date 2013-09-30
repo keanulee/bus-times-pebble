@@ -1,0 +1,11 @@
+
+{"friendlyVersion": "VERSION",
+ "versionDefName": "VERSION",
+ "media": [
+	{
+            "defName": "IMAGE_MENU_ICON",
+            "type": "png",
+            "file": "images/menu_icon.png"
+        }
+	  ]
+}
