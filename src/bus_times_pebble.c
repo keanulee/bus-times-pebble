@@ -47,13 +47,18 @@ static int route_index;
 
 // Location information
 static int our_latitude, our_longitude, our_accuracy;
-
+static bool located;
 
 // This function is defined at the end of this file
 void httpebble_error(int error_code);
 
 void get_data_from_server(const int32_t request_id, int button)
 {
+	if (!located) {
+		http_location_request();
+		return;
+	}
+
 	DictionaryIterator* dict;
 	HTTPResult result = http_out_get(URL, request_id, &dict);
 	if (result != HTTP_OK) {
@@ -154,6 +159,7 @@ void location(float latitude, float longitude, float altitude, float accuracy, v
 	our_longitude = longitude * 10000;
 	our_accuracy  = accuracy;
 	
+	located = true;
 	get_data_from_server(HTTP_STOPS, 0);
 }
 
@@ -209,7 +215,10 @@ void handle_init(AppContextRef ctx)
 	layer_add_child(&window.layer, &layer_text4.layer);
 
 	graphics_draw_line(ctx, GPoint(0, 55), GPoint(144, 59));
-	http_location_request();
+
+	located = false;
+	get_data_from_server(HTTP_STOPS, 0);
+
 	window_set_click_config_provider(&window, (ClickConfigProvider) click_config_provider);
 }
 

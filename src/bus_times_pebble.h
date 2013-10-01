@@ -2,7 +2,8 @@
 #define BUS_TIMES_PEBBLE_H
 
 // The URL that will serve responses
-#define URL "http://192.168.0.18:3000/watch"
+#define URL "http://bus-times-server.keanulee.com/watch"
+// #define URL "http://192.168.0.18:3000/watch"
 #define AGENCY "Grand River Transit"
 
 // To make multi-version compilation simple, these type of config defines
