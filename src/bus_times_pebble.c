@@ -49,6 +49,10 @@ static int route_index;
 static int our_latitude, our_longitude, our_accuracy;
 static bool located;
 
+// Flag to get routes information. Used to separate the requests for stops and routes
+static bool get_routes;
+static bool request_in_progress;
+
 // This function is defined at the end of this file
 void httpebble_error(int error_code);
 
@@ -59,24 +63,28 @@ void get_data_from_server(const int32_t request_id, int button)
 		return;
 	}
 
-	DictionaryIterator* dict;
-	HTTPResult result = http_out_get(URL, request_id, &dict);
-	if (result != HTTP_OK) {
-		httpebble_error(result);
-		return;
-	}
+	if (!request_in_progress) {
+		request_in_progress = true;
 
-	dict_write_int32(dict, KEY_STOP_ID, stop_ids[stop_index]);
-	dict_write_int32(dict, KEY_LATITUDE, our_latitude);
-	dict_write_int32(dict, KEY_LONGITUDE, our_longitude);
-	dict_write_int32(dict, KEY_ACCURACY, our_accuracy);
-	dict_write_int32(dict, KEY_PAGE, route_index);
-	dict_write_int32(dict, KEY_BUTTON, button);
+		DictionaryIterator* dict;
+		HTTPResult result = http_out_get(URL, request_id, &dict);
+		if (result != HTTP_OK) {
+			httpebble_error(result);
+			return;
+		}
 
-	result = http_out_send();
-	if (result != HTTP_OK) {
-		httpebble_error(result); 
-		return;
+		dict_write_int32(dict, KEY_STOP_ID, stop_ids[stop_index]);
+		dict_write_int32(dict, KEY_LATITUDE, our_latitude);
+		dict_write_int32(dict, KEY_LONGITUDE, our_longitude);
+		dict_write_int32(dict, KEY_ACCURACY, our_accuracy);
+		dict_write_int32(dict, KEY_PAGE, route_index);
+		dict_write_int32(dict, KEY_BUTTON, button);
+
+		result = http_out_send();
+		if (result != HTTP_OK) {
+			httpebble_error(result); 
+			return;
+		}
 	}
 }
 
@@ -119,6 +127,8 @@ void set_names()
 
 void http_success(int32_t request_id, int http_status, DictionaryIterator* received, void* context)
 {
+	request_in_progress = false;
+
 	if (request_id == HTTP_STOPS) {
 		stop_count = 0;
 		for (int i = 0; i < NUM_STOPS; ++i) {
@@ -129,7 +139,7 @@ void http_success(int32_t request_id, int http_status, DictionaryIterator* recei
 			}
 		}
 		memcpy(stop_id_str, itoa(stop_ids[stop_index]), 5);
-		get_data_from_server(HTTP_ROUTE, 0);
+		get_routes = true;
 	}
 	if (request_id == HTTP_ROUTE) {
 		Tuple* tuple0 = dict_find(received, KEY_STOP_NAME_STR);
@@ -149,6 +159,7 @@ void http_failure(int32_t request_id, int http_status, void* context)
 
 void window_appear(Window* me)
 {
+	text_layer_set_text(&layer_text1, "Loading...");
 	text_layer_set_text(&layer_text4, AGENCY);
 }
 
@@ -222,10 +233,23 @@ void handle_init(AppContextRef ctx)
 	window_set_click_config_provider(&window, (ClickConfigProvider) click_config_provider);
 }
 
+void handle_tick(AppContextRef ctxt, PebbleTickEvent *event)
+{
+	if (get_routes) {
+		get_routes = false;
+		get_data_from_server(HTTP_ROUTE, 0);
+	}
+}
+
 void pbl_main(void *params)
 {
 	PebbleAppHandlers handlers = {
 		.init_handler = &handle_init,
+		.tick_info =
+		{
+			.tick_handler = &handle_tick,
+			.tick_units = SECOND_UNIT
+		},
 		.messaging_info = {
 			.buffer_sizes = {
 				.inbound  = 256,
@@ -239,6 +263,8 @@ void pbl_main(void *params)
 
 void httpebble_error(int error_code)
 {
+	request_in_progress = false;
+
 	static char error_message[] = "UNKNOWN_HTTP_ERRROR_CODE_GENERATED";
 	switch (error_code) {
 		case HTTP_SEND_TIMEOUT:
